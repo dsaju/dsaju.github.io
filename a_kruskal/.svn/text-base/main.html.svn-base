@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Kruskal Demonstration</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+  <head>
+  <body>
+    
+    <header class="banner">
+      <h1>Kruskal Algorithm Demonstration</h1>
+    </header>
+    
+    <nav>
+      <ul>
+        <li><a href="#intro">Description</a></li>
+        <li><a href="#demo">Interactive Demo</a></li>
+        <li><a href="#ref">References</a></li>
+        <li><a href="#cont">Contact</a></li> 
+        <li><a href="README.txt">Documentation</a></li>      
+      </ul>
+    </nav>
+    
+    <main>
+      <section>
+        <h2 id="intro">Description</h2>
+        <p> Kruskal's algorithm is a greedy algorithm in graph theory that finds a minimum spanning tree for a connected weighted graph.<br><br>This means it finds a subset of the edges that forms a tree that includes every vertex, where the total weight of all the edges in the tree is minimized.<br><br> If the graph is not connected, then it finds a minimum spanning forest (a minimum spanning tree for each connected component). <br>This means it finds a subset of the edges that forms a tree that includes every vertex, where the total weight of all the edges in the tree is minimized. If the graph is not connected, then it finds a minimum spanning forest (a minimum spanning tree for each connected component).</p>
+      </section>
+    
+      <section>
+        <h2 id="demo">Interative Demo</h2>
+        <p> Click on "Simulate Krukal Algorithm" to start the simulation and then click on "Next Step" to continue<br>The graph with green edges displays the MINIMUM SPANNING TREE </p>
+    </section>
+	<script src="http://d3lp1msu2r81bx.cloudfront.net/kjs/js/lib/kinetic-v5.0.2.min.js"></script>
+		<script src="js/Edge.js"></script>
+		<script src="js/Graph.js"></script>
+		<script src="js/Kruskal.js"></script>
+		<script src="js/Node.js"></script>
+		<table>
+			<tr>
+				<td><button id='add-node'>Add a node</button></td>
+				<td><button id='remove-node'>Remove a node</button></td>
+				<td><button id='add-edge'>Add an edge</button></td>
+				<td><button id='remove-edge'>Remove an edge</button></td>
+				<td><button type='button' id='simulate-kruskal'>Simulate Kruskal Algorithm</button></td>
+				<td><button id='next-step'>Next Step</button></td>
+				<td><button id='clear'>Clear</button></td>
+				<td><button id='prebuilt-graphs'>Prebuilt Graphs</button></td>
+			</tr>
+		</table>
+		
+		<table> 
+			<tr><td><div id="container"></div></td></tr>
+			<tr><td><div id="matrix"></div></td></tr>
+		</table>
+		<script type="text/javascript" defer="defer">
+
+			var t; // by Jens, for the kruskal object, just for test purposes (direct access within the browser)
+
+
+			function CanvasGraph() {
+               
+				var size = { 
+					width: 950,  
+					height: 380
+				};
+
+				this._stage = new Kinetic.Stage({
+						container: 'container',
+						width: size.width,
+  						height: size.height
+					});
+
+				this._layer = new Kinetic.Layer();
+
+				var bg = new Kinetic.Rect({
+						id: 'bg',
+						x: 0,
+        				y: 0,
+        				width: size.width,
+        				height: size.height,
+        				fill: '#E5E4E2'
+				});
+
+				this._graph  = new Graph();
+				this._kruskal = new Kruskal();
+				t = this._kruskal;
+				this._kruskal.graph = this._graph;	
+				
+				this._tooltip = null;
+				this._tooltip_text=null;
+				
+				this._operation = 0;
+				//ADD_NODE is 0
+				this._node_index = 0;
+				this._prev_node = null;
+				this._curr_node = null;
+
+				this._stage.add(this._layer);
+				this._layer.add(bg);
+
+				this._callback = null;
+			};
+
+			CanvasGraph.prototype = {
+
+				//Initialize function
+				//args: callback for reporting operations
+				//Purpose: responds to click on canvas
+				Init: function(callback) {
+					var self = this;
+					this._callback = callback;
+					this._layer.on('click', function(e){
+						var mouseXY = self._stage.getPointerPosition();
+						if ( self._operation == 0 ) { //add a new node
+							self.CreateNode(mouseXY.x, mouseXY.y);
+						} else if ( self._operation == 1) { //remove a node
+							var node = e.target;
+							if ( node.getId() != 'bg') {
+								self.RemoveNode(node.getId());
+							}
+						} else if ( self._operation == 2) { //add an edge
+							var node = e.target;
+							if ( node.getId() != 'bg') {
+								if ( self._curr_node == null ) {
+									self._curr_node = node;
+								}
+								else { 
+									self._prev_node = self._curr_node;
+									self._curr_node = node;
+
+									self._prev_node = self._layer.get('#circle_'+ self._prev_node.getId().split('_')[1])[0];
+									self._curr_node = self._layer.get('#circle_'+ self._curr_node.getId().split('_')[1])[0];
+
+									if ( IsDuplicateEdge (self._prev_node, self._curr_node)) {
+										alert('duplicate edge');
+									} else if ( IsSameNode(self._prev_node, self._curr_node)) {
+										alert('Please select distinct node');
+									} else {
+										var weight = prompt("Enter the weight of the edge", "50");
+ 										self.CreateEdge(self._prev_node, self._curr_node, parseInt(weight)); 
+ 									}
+
+ 									self._curr_node = null;
+ 									self._prev_node = null;
+ 									self._tooltip_text = null;
+ 								}
+							}
+						} else if (self._operation == 3) { //remove an edge
+							var line = e.target;
+							if (line.getId().split('_')[0] == 'line') {
+								self.RemoveEdge(line);
+							}
+						}
+					});
+					self._layer.draw();
+
+					//checks if edge is duplicate
+					function IsDuplicateEdge(start, end) {
+						for(var k=0; k < self._graph.edges.length; k++) {
+							var edge = self._graph.edges[k];
+							if ( (edge.kCircleA == start && edge.kCircleB == end) ||
+									(edge.kCircleA == end && edge.kCircleB == start) )
+								return true;
+						}
+						return false;
+					}
+
+					//checks if clicked on the same node twice
+					function IsSameNode(start, end) {
+						if ( start.getId() == end.getId() )
+							return true;
+						else 
+							return false;
+					}
+
+				},
+
+
+				ShowTooltip: function(x,y) {
+					this._tooltip = new Kinetic.Label({
+	        				x: x,
+	        				y: y,
+	        				opacity: 0.75
+	      				});
+
+	      			this._tooltip.add(new Kinetic.Tag({
+	       		 			fill: 'green',
+	        				pointerDirection: 'down',
+	        				pointerWidth: 10,
+	        				pointerHeight: 10,
+	        				lineJoin: 'round',
+	        				shadowColor: 'black',
+	        				shadowBlur: 3,
+	        				shadowOffset: {x:2,y:2},
+	        				shadowOpacity: 0.1
+	      				}));
+
+					this._tooltip.add(new Kinetic.Text({
+	        				text: this._tooltip_text,
+	        				fontFamily: 'Calibri',
+	        				fontSize: 18,
+	        				padding: 5,
+	        				fill: 'white'
+	      				}));
+	            	this._layer.add(this._tooltip);
+				},
+
+				HideTooltip: function() {
+					this._tooltip.destroy();
+				},
+
+				CreateNode: function(x,y) {
+					this._node_index ++;
+					var nodeGroup = new Kinetic.Group({
+							draggable: true,
+							width: 30,
+							height: 30
+						});
+
+					var circle = new Kinetic.Circle({
+							id: 'circle_' + this._node_index,
+							radius: 10,
+							fill: '#00FFFF',
+							stroke: '#6960EC',
+							strokeWidth: 2,
+							numPoints: 20,
+							x: x,
+							y: y,
+							draggable: true,
+							shadowOffset: 5,
+							shadowColor: 'black',
+							shadowBlur: 5,
+							shadowOpacity: 0.5,
+						});
+
+				 	// add hover styling
+				 	var self = this;
+        			circle.on('mouseover', function() {
+          				document.body.style.cursor = 'pointer';
+          				this.setStrokeWidth(4);
+          				var mousePos = self._stage.getPointerPosition();
+          				if ( self._operation == 2 && self._curr_node == null) {
+          					self._tooltip_text = "Click to make it source node";
+          				} else if ( self._operation == 2 && self._prev_node == null) {
+          					self._tooltip_text = "Click to make it destination node";
+          				} else if (self._operation == 1)
+          					self._tooltip_text = "Click to delete Node " + this.getId().split('_')[1];
+          				else {
+          					self._tooltip_text = "Node " + this.getId().split('_')[1];
+          				}
+                		self.ShowTooltip(mousePos.x, mousePos.y);
+      					self._layer.draw();
+        			});
+
+        			circle.on('mouseout', function() {
+          				document.body.style.cursor = 'default';
+          				this.setStrokeWidth(2);
+          				self.HideTooltip();
+          				self._layer.draw();
+        			});
+
+        			circle.on("dragend", dragMove);
+			
+					var text = new Kinetic.Text({
+							id: 'text_' + self._node_index,
+    						text: '' + self._node_index,
+    						fontSize: 10,
+    						fontFamily: 'Calibri',
+    						width: 5,
+    						fill: 'black'
+						});
+					text.setX( circle.getX() - text.getWidth() );
+					text.setY( circle.getY() - text.getHeight()/2 );
+					self._layer.add(circle);
+					self._layer.add(text);
+					self._layer.draw();
+
+					self._graph.addNode(circle);
+
+				
+					//called when the user drags a node
+					//end of the line attached to that node is also dragged
+					function dragMove() { //jens code
+        				for (var k = 0; k < self._graph.edges.length; k++) {
+	        				var text = self._layer.get('#text_'+this.getId().split('_')[1]);
+	        				text.setX( this.getX());
+							text.setY( this.getY());
+							var edge = self._graph.edges[k];
+							if (edge.kCircleA == this || edge.kCircleB == this) {
+								edge.kLine.setPoints([ edge.kCircleA.getX(), edge.kCircleA.getY(), edge.kCircleB.getX(), edge.kCircleB.getY() ]);
+								edge.kLine.lineText.setX(edge.kCircleA.getX()/2+edge.kCircleB.getX()/2);
+								edge.kLine.lineText.setY(edge.kCircleA.getY()/2+edge.kCircleB.getY()/2);
+							}
+						}
+						self._layer.draw();
+					}
+
+					self._callback('node-added');
+
+				},
+
+				RemoveNode: function(index) {
+					if ( this._operation == 1 ) {
+						var circle = this._layer.get('#circle_'+ index.split('_')[1])[0];
+						var text = this._layer.get('#text_'+ index.split('_')[1])[0];
+						circle.destroy();
+						text.destroy();
+						this._graph.deleteNode(circle);
+						var edges = this._graph.edgesOf(circle);
+
+						//delete all edges connected to that node
+						for(var i in edges)  {
+							this._graph.deleteEdge(edges[i].kLine);
+							edges[i].kLine.lineText.destroy();
+							edges[i].kLine.destroy();
+							this._callback('edge-removed');
+						}
+						this._layer.draw();
+
+						this._callback('node-removed');
+					}
+				},
+
+				CreateEdge: function(start, end, weight) {
+					if ( this._operation == 2 ) {
+						var start_id = start.getId().split('_')[1];
+						var end_id = end.getId().split('_')[1];
+						var line = new Kinetic.Line({
+								id: 'line_'+start_id+'_'+end_id,
+	        					points: [start.getX(), start.getY(), end.getX(), end.getY()],
+	        					stroke: 'red',
+	        					strokeWidth: 2,
+	        					lineCap: 'round',
+	        					lineJoin: 'round',
+	        					draggable: false
+	 						});
+						var self = this;
+
+						//hover effect on the line
+						line.on('mouseover', function() {
+	          				document.body.style.cursor = 'pointer';
+	          				this.setStrokeWidth(4);
+	          				var mousePos = self._stage.getPointerPosition();
+	          				if ( self._operation == 3 ) {
+	          					self._tooltip_text = "Click to delete edge " + this.getId().split('_')[1];
+	          				} else {
+	          					self._tooltip_text = "Edge " + this.getId().split('_')[1];
+	          				}
+	          				var mousePos = self._stage.getPointerPosition();
+	          				self.ShowTooltip(mousePos.x, mousePos.y);
+	      					self._layer.draw();
+	        			});
+
+	        			line.on('mouseout', function() {
+	          				document.body.style.cursor = 'default';
+	          				this.setStrokeWidth(2);
+	          				self.HideTooltip();
+	          				self._layer.draw();
+	        			});
+
+		        		//Adding the textlable for the edge weight . sd
+			        	var a = start.getX() / 2 + end.getX() / 2 ;
+	        	    	var b = start.getY() / 2 + end.getY() / 2 ;
+	    	
+	      				var lineText = new Kinetic.Text({
+	            				x:a,
+	            				y:b,
+	            				text: "" + weight,
+	            				fontFamily: 'Calibri',
+		            			fontSize: 18,
+	    	        			padding: 5,
+	        	    			fill: 'black'
+	            			});
+	            		
+	            		lineText.on('click', function(evt) {
+	            		      weight = prompt('New Weight:',weight);
+	                          this.setText(weight);
+	                          self._graph.editEdge(line, parseInt(weight));
+	                          self._layer.draw(); //redraw the layer containing the textfield
+	                    });
+						
+						
+						line.lineText = lineText;
+
+						self._layer.add(line);
+						self._layer.add(lineText);
+
+						line.setZIndex(-2);
+
+		 				self._layer.draw();
+		 				self._graph.addEdge(line,start,end,weight); //default weight
+
+		 				self._callback('edge-added');
+		 			}
+				},
+
+				RemoveEdge: function(line) {
+
+					if ( this._operation == 3 ) {
+						line.destroy();
+						line.lineText.destroy();
+						this._graph.deleteEdge(line);				
+
+						this._callback('edge-removed');
+					}
+				},
+
+				//calls next step function in the backend
+				DoNextStep: function() {
+					this._kruskal.nextStep();
+					this._layer.draw();
+					if (this._kruskal.lastState == KruskalStates.FINISHED) {
+						alert("KRUSKAL ALGORITHM COMPLETED SUCCESSFULLY!");
+					}
+				},
+
+				//destroys kineticjs layer and stage object
+				Destroy: function() {
+					this._layer.destroy();
+					this._stage.destroy();
+				}
+			};
+
+
+
+			//action class
+			function Action () {
+				this._simulation_flag = false;				
+				this._canvas = new CanvasGraph();
+				this._node_cnt = 0;
+				this._edge_cnt = 0;
+			}
+
+			Action.prototype = {
+
+				//no-time for event handling :(
+				//callbacks
+
+				//Called by the CanvasGraph when a new node added
+				NodeAdded: function() {
+
+					this._node_cnt ++;
+					if ( this._node_cnt >= 1) {
+						document.getElementById("remove-node").disabled=false;	
+					}
+					if ( this._node_cnt >= 2) {
+						document.getElementById("add-edge").disabled=false;	
+					}
+					console.log('node and edge : ' + this._node_cnt + ' : ' + this._edge_cnt);
+				},
+
+				//Called by the CanvasGraph when a node removed
+				NodeRemoved: function() {
+
+					this._node_cnt --;
+					if ( this._node_cnt < 1) {
+						document.getElementById("remove-node").disabled=true;	
+					}
+					if ( this._node_cnt < 2) {
+						document.getElementById("add-edge").disabled=true;	
+					}
+					console.log('node and edge : ' + this._node_cnt + ' : ' + this._edge_cnt);
+				},
+
+				//Called by the CanvasGraph when a new edge added
+				EdgeAdded: function() {
+
+					this._edge_cnt ++;
+					if ( this._edge_cnt >= 1) {
+						document.getElementById("remove-edge").disabled=false;	
+					}
+					if ( this._edge_cnt >= 2) {
+						document.getElementById("simulate-kruskal").disabled=false;
+					}
+
+				},
+
+				//Called by the CanvasGraph when a edge is  removed
+				EdgeRemoved: function() {
+
+					console.log('EdgeRemoved');
+
+					this._edge_cnt --;
+					if ( this._edge_cnt < 1) {
+						document.getElementById("remove-edge").disabled=true;	
+					}
+					if ( this._edge_cnt < 2) {
+						document.getElementById("simulate-kruskal").disabled=true;
+					}
+
+				},
+				//callback ends
+				
+				AddNode: function() {
+					this._canvas._operation = 0;
+				},
+				
+				RemoveNode: function() {
+					this._canvas._operation = 1;
+				},
+				
+				AddEdge: function() {
+					this._canvas._operation = 2;
+				},
+
+				RemoveEdge: function() {
+					this._canvas._operation = 3;
+				},
+
+				//Simulate Action
+				Simulate: function() {
+					if (this._simulation_flag) {
+						this._simulation_flag = false;
+						document.getElementById("add-node").disabled=false;
+						document.getElementById("remove-node").disabled=false;
+						document.getElementById("add-edge").disabled=false;
+						document.getElementById("remove-edge").disabled=false;
+						document.getElementById("prebuilt-graphs").disabled=false;
+						document.getElementById("simulate-kruskal").innerHTML="Simulate Kruskal Algorithm";
+						document.getElementById("next-step").disabled=true;
+
+						this._canvas._kruskal.reset();
+						this._canvas._layer.draw();
+					}else {
+						this._simulation_flag = true;
+						document.getElementById("add-node").disabled=true;
+						document.getElementById("remove-node").disabled=true;
+						document.getElementById("add-edge").disabled=true;
+						document.getElementById("remove-edge").disabled=true;
+						document.getElementById("prebuilt-graphs").disabled=true;
+						document.getElementById("simulate-kruskal").innerHTML="Reset";
+						document.getElementById("next-step").disabled=false;
+						this._canvas._kruskal.nextStep();
+						this._canvas._layer.draw();
+					}
+					this._canvas._operation = 4;
+				},
+
+				//initializes CanvasGraph and registers the callback
+				Start: function() {
+					//this._canvas.Destroy();
+					this._canvas = new CanvasGraph();
+
+					var self = this;
+
+					this._canvas.Init(function(type) {
+						if ( type == 'node-added') {
+							self.NodeAdded();						
+						}
+						else if ( type == 'node-removed') {
+							self.NodeRemoved();
+						}
+						else if ( type == 'edge-added') {
+							self.EdgeAdded();
+						}else {
+							self.EdgeRemoved();
+						}
+					});
+
+					document.getElementById("add-node").disabled=false;
+					document.getElementById("remove-node").disabled=true;
+					document.getElementById("add-edge").disabled=true;
+					document.getElementById("remove-edge").disabled=true;
+					document.getElementById("simulate-kruskal").disabled=true;
+					document.getElementById("next-step").disabled=true;
+				},
+
+				//executes the next step in kruskal algorithim
+				DoNextStep: function() {
+					this._canvas.DoNextStep();
+				},
+
+				//clears the graph drawn in the canvas
+				Reset: function() {
+					this._canvas.Destroy();
+					this._canvas._kruskal.deleteAll();
+					this.Start();
+
+					this._node_cnt = 0;
+					this._edge_cnt = 0;
+
+					this._simulation_flag = false;
+					document.getElementById("add-node").disabled=false;
+					document.getElementById("remove-node").disabled=true;
+					document.getElementById("add-edge").disabled=true;
+					document.getElementById("remove-edge").disabled=true;
+					document.getElementById("prebuilt-graphs").disabled=false;
+					document.getElementById("simulate-kruskal").innerHTML="Simulate Kruskal Algorithm";
+					document.getElementById("simulate-kruskal").disabled = true;
+					document.getElementById("next-step").disabled=true;
+				},
+
+			};
+			
+			//node poitions and edge weight of preloaded graphs
+			function PreloadedGraphs() {
+
+				this._nodes = [ {x: 95, y:142, index: 1},
+							  {x: 524, y:139, index: 2},
+							  {x: 86, y:339, index: 3},
+							  {x: 536, y:333, index: 4},
+							  {x: 292, y:232, index: 5},
+							  {x: 742, y:228, index: 6},
+							  {x: 302, y:40, index: 7}];
+
+				this._edges = [ { src: 1, dst: 7, weight: 100}, { src: 1, dst: 3, weight: 200}, { src: 1, dst: 5, weight: 50},
+							  { src: 7, dst: 2, weight: 20}, { src: 7, dst: 5, weight: 120},
+							  { src: 2, dst: 6, weight: 110}, { src: 2, dst: 4, weight: 150}, { src: 2, dst: 5, weight: 130},
+							  { src: 6, dst: 4, weight: 90}, 
+							  { src: 4, dst: 5, weight: 60},
+							  { src: 3, dst: 4, weight: 10}, { src: 3, dst: 5, weight: 190} ];
+
+				nodeIndex = 7;
+			};
+
+			PreloadedGraphs.prototype = {
+
+				//draws the preloaded graph on canvas
+				Draw: function(canvasGraph, action) {
+					action.AddNode();
+					for(var i=0; i<this._nodes.length; i++) {
+						canvasGraph.CreateNode(this._nodes[i].x, this._nodes[i].y);
+					}
+
+					action.AddEdge();
+					for(var i=0; i<this._edges.length; i++) {
+						var src = canvasGraph._layer.get('#circle_'+this._edges[i].src)[0];
+						var dst = canvasGraph._layer.get('#circle_'+this._edges[i].dst)[0];
+						canvasGraph.CreateEdge(src, dst, this._edges[i].weight);
+					}
+
+
+
+					document.getElementById("add-node").disabled=false;
+					document.getElementById("remove-node").disabled=false;
+					document.getElementById("add-edge").disabled=false;
+					document.getElementById("remove-edge").disabled=false;
+					document.getElementById("simulate-kruskal").innerHTML="Simulate Kruskal Algorithm";
+					document.getElementById("simulate-kruskal").disabled = false;
+					document.getElementById("next-step").disabled=false;
+
+				}
+			};
+
+
+			//main js code
+
+			var action = new Action();
+			var prebuiltGraph = new PreloadedGraphs();
+			action.Start();
+
+			document.getElementById('add-node').addEventListener('click', function() {
+				action.AddNode();
+			});
+
+			document.getElementById('remove-node').addEventListener('click', function() {
+				action.RemoveNode();
+			});
+
+			document.getElementById('add-edge').addEventListener('click', function() {
+				action.AddEdge();
+			});
+
+			document.getElementById('remove-edge').addEventListener('click', function() {
+				action.RemoveEdge();
+			});
+
+			document.getElementById('simulate-kruskal').addEventListener('click', function() {
+				action.Simulate();
+			});
+
+			document.getElementById('prebuilt-graphs').addEventListener('click', function() {
+				action.Reset();
+				prebuiltGraph.Draw(action._canvas, action);
+			});
+
+			document.getElementById('next-step').addEventListener('click', function() {
+				action.DoNextStep();
+			});
+
+			document.getElementById('clear').addEventListener('click', function() {
+				action.Reset();
+			});
+
+			window.onload=function(){
+				action.Reset();
+				prebuiltGraph.Draw(action._canvas, action);
+			};
+		
+		</script>
+
+    <section>
+        <h2 id="ref">References</h2>
+        <p>http://en.wikipedia.org/wiki/Kruskal's_algorithm <br>http://www.html5canvastutorials.com/kineticjs/<p>
+    </section>
+    
+    <section>
+        <h2 id="cont">Contact</h2>
+        <p>Authors : Asit Kumar Dhal , Jens Forstmann , Saju Daniel <br> Date : June 2014 <br>For any issues contact : kn1@KOM.tu-darmstadt.de</p>
+    </section>
+
+
+	
+    </main>
+    
+    <footer>
+    <p>Demo Kruskal</p>
+    </footer>
+    
+  </body>
+</html> 
